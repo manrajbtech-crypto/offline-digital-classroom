@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Offline EduHub | Student Portal</title>
+  <style>
+    :root { --primary: #2563eb; --bg: #f8fafc; --card-bg: #ffffff; --text: #0f172a; --text-muted: #64748b; }
+    body { font-family: sans-serif; background-color: var(--bg); color: var(--text); padding: 16px; display: flex; justify-content: center; }
+    .app-container { width: 100%; max-width: 480px; }
+    
+    .header { background: linear-gradient(135deg, #1e40af, var(--primary)); color: white; padding: 20px; border-radius: 16px; margin-bottom: 20px; text-align: center; }
+    .header h1 { margin: 0; font-size: 22px; }
+    
+    .tabs { display: flex; gap: 8px; margin-bottom: 16px; }
+    .tab-btn { flex: 1; padding: 12px; background: #e2e8f0; color: var(--text-muted); border: none; border-radius: 10px; font-weight: 600; cursor: pointer; }
+    .tab-btn.active { background: var(--primary); color: white; }
+    
+    .tab-content { display: none; background: var(--card-bg); border-radius: 16px; padding: 20px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
+    .tab-content.active { display: block; }
+
+    .book-item { display: flex; justify-content: space-between; align-items: center; padding: 12px; border: 1.5px solid #e2e8f0; border-radius: 10px; margin-bottom: 10px; }
+    .btn-download { background: #eff6ff; color: var(--primary); padding: 8px 12px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 13px; }
+
+    .quiz-card { border: 1px solid #e2e8f0; border-radius: 10px; padding: 15px; margin-bottom: 15px; background: #fafafa; }
+    input[type="text"] { width: 100%; padding: 12px; border: 1.5px solid #cbd5e1; border-radius: 10px; box-sizing: border-box; margin-bottom: 15px; }
+    .radio-option { display: flex; padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px; margin-bottom: 8px; background: white; cursor: pointer; }
+    .radio-option input { margin-right: 10px; }
+    .btn-submit { width: 100%; background: var(--primary); color: white; border: none; padding: 14px; border-radius: 10px; font-size: 16px; font-weight: bold; cursor: pointer; }
+    
+    #status-banner { display: none; padding: 12px; border-radius: 10px; text-align: center; margin-top: 12px; font-weight: bold; }
+    .status-success { background: #dcfce7; color: #15803d; }
+    .status-warning { background: #fef3c7; color: #b45309; }
+  </style>
+</head>
+<body>
+
+  <div class="app-container">
+    <div class="header">
+      <h1>Offline EduHub</h1>
+      <p style="margin: 5px 0 0; font-size: 13px;">BuildFest 2.0 Edge Classroom</p>
+    </div>
+
+    <div class="tabs">
+      <button class="tab-btn active" onclick="switchTab('quiz')">✍️ Take Quiz</button>
+      <button class="tab-btn" onclick="switchTab('books')">📚 Digital Library</button>
+    </div>
+
+    <!-- TAB 1: Quiz -->
+    <div id="tab-quiz" class="tab-content active">
+      <h3 style="margin-top: 0;">Knowledge Check</h3>
+      <input type="text" id="studentName" placeholder="Student Name (e.g. Rahul)">
+      
+      <div id="quiz-container">Loading quizzes...</div>
+
+      <button class="btn-submit" onclick="submitQuiz()">Submit Answers</button>
+      <div id="status-banner"></div>
+    </div>
+
+    <!-- TAB 2: Books -->
+    <div id="tab-books" class="tab-content">
+      <h3 style="margin-top: 0;">Study Materials</h3>
+      <div id="student-library">Loading books...</div>
+    </div>
+  </div>
+
+  <script>
+    let activeQuizzes = [];
+
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.getElementById('tab-' + tabId).classList.add('active');
+      event.currentTarget.classList.add('active');
+      if(tabId === 'books') fetchBooks();
+      if(tabId === 'quiz') fetchQuizzes();
+    }
+
+    function fetchQuizzes() {
+      fetch('/api/quizzes')
+        .then(res => res.json())
+        .then(data => {
+          activeQuizzes = data;
+          const container = document.getElementById('quiz-container');
+          if (data.length === 0) {
+            container.innerHTML = '<p style="color: #64748b;">No active quizzes published by teacher.</p>';
+            return;
+          }
+          container.innerHTML = '';
+          data.forEach((q, idx) => {
+            let optionsHtml = '';
+            q.options.forEach((opt, optIdx) => {
+              optionsHtml += `
+                <label class="radio-option">
+                  <input type="radio" name="quiz_${q.id}" value="${optIdx}"> ${opt}
+                </label>`;
+            });
+            container.innerHTML += `
+              <div class="quiz-card">
+                <p style="font-weight:bold; margin-top:0;">Q${idx+1}: ${q.question}</p>
+                ${optionsHtml}
+              </div>`;
+          });
+        });
+    }
+
+    function fetchBooks() {
+      fetch('/api/books')
+        .then(res => res.json())
+        .then(data => {
+          const container = document.getElementById('student-library');
+          if (data.length === 0) {
+            container.innerHTML = '<p style="color: #64748b;">No books uploaded by teacher yet.</p>';
+            return;
+          }
+          container.innerHTML = '';
+          data.forEach(book => {
+            container.innerHTML += `
+              <div class="book-item">
+                <strong>${book.title}</strong>
+                <a href="/books/${book.filename}" target="_blank" class="btn-download">📖 Read PDF</a>
+              </div>`;
+          });
+        });
+    }
+
+    function submitQuiz() {
+      const name = document.getElementById('studentName').value.trim();
+      if (!name) return alert("Please enter your name.");
+      if (activeQuizzes.length === 0) return alert("No active quizzes to submit.");
+
+      let correctCount = 0;
+      let answeredCount = 0;
+
+      activeQuizzes.forEach(q => {
+        const selected = document.querySelector(`input[name="quiz_${q.id}"]:checked`);
+        if (selected) {
+          answeredCount++;
+          if (parseInt(selected.value) === q.correctIndex) correctCount++;
+        }
+      });
+
+      if (answeredCount === 0) return alert("Please answer at least one question.");
+
+      const totalScore = Math.round((correctCount / activeQuizzes.length) * 100);
+      const payload = { studentName: name, score: totalScore, timestamp: Date.now() };
+      
+      attemptSubmit(payload);
+    }
+
+    function attemptSubmit(data) {
+      const banner = document.getElementById('status-banner');
+      banner.style.display = 'block';
+
+      fetch('/api/submit-quiz', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data) })
+        .then(() => {
+          banner.className = 'status-success';
+          banner.innerText = `✅ Score (${data.score}%) Saved to Teacher Dashboard!`;
+          removeFromLocalStorage(data.timestamp);
+        })
+        .catch(() => {
+          banner.className = 'status-warning';
+          banner.innerText = `⚡ Offline. Score (${data.score}%) saved locally. Will auto-sync when reconnected.`;
+          saveToLocalStorage(data);
+        });
+    }
+
+    function saveToLocalStorage(data) {
+      let q = JSON.parse(localStorage.getItem('quiz_queue') || '[]');
+      if (!q.some(i => i.timestamp === data.timestamp)) { q.push(data); localStorage.setItem('quiz_queue', JSON.stringify(q)); }
+    }
+
+    function removeFromLocalStorage(ts) {
+      let q = JSON.parse(localStorage.getItem('quiz_queue') || '[]');
+      localStorage.setItem('quiz_queue', JSON.stringify(q.filter(i => i.timestamp !== ts)));
+    }
+
+    setInterval(() => {
+      let q = JSON.parse(localStorage.getItem('quiz_queue') || '[]');
+      if (q.length > 0) q.forEach(item => attemptSubmit(item));
+    }, 4000);
+
+    fetchQuizzes();
+  </script>
+</body>
+</html>

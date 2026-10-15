@@ -1,0 +1,20 @@
+[
+  {
+    "id": 1792070946514,
+    "question": "Who is the PM of India",
+    "options": [
+      "Narendra Modi",
+      "Rahul Gandhi"
+    ],
+    "correctIndex": 0
+  },
+  {
+    "id": 1792070975136,
+    "question": "There are how many subjects in Sem 3",
+    "options": [
+      "5",
+      "4"
+    ],
+    "correctIndex": 1
+  }
+]

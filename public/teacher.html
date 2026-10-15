@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Teacher Operations Dashboard</title>
+  <style>
+    :root { --bg: #0f172a; --card-bg: #1e293b; --accent: #3b82f6; --text: #f8fafc; --text-dim: #94a3b8; }
+    body { font-family: sans-serif; background-color: var(--bg); color: var(--text); padding: 30px; max-width: 1100px; margin: auto; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    .card { background: var(--card-bg); padding: 20px; border-radius: 12px; border: 1px solid #334155; margin-bottom: 20px; }
+    h1, h3 { margin-top: 0; }
+    table { width: 100%; border-collapse: collapse; text-align: left; margin-top: 15px; }
+    th { background: #090d16; padding: 12px; color: var(--text-dim); }
+    td { padding: 12px; border-bottom: 1px solid #334155; }
+    .btn { background: var(--accent); color: white; padding: 10px 15px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; }
+    .btn-danger { background: #ef4444; padding: 6px 10px; font-size: 12px; }
+    input[type="text"], input[type="file"], select { width: 100%; padding: 10px; margin-bottom: 10px; border-radius: 6px; border: 1px solid #334155; background: #0f172a; color: white; box-sizing: border-box; }
+  </style>
+</head>
+<body>
+
+  <h1>Teacher Operations Dashboard</h1>
+  
+  <div class="grid">
+    <!-- QUIZ CREATOR -->
+    <div class="card">
+      <h3>✍️ Create & Publish Quiz</h3>
+      <input type="text" id="qQuestion" placeholder="Enter Question text">
+      <input type="text" id="qOpt1" placeholder="Option 1">
+      <input type="text" id="qOpt2" placeholder="Option 2">
+      
+      <label style="font-size: 12px; color: var(--text-dim);">Correct Answer:</label>
+      <select id="qCorrect">
+        <option value="0">Option 1 is Correct</option>
+        <option value="1">Option 2 is Correct</option>
+      </select>
+      
+      <button class="btn" onclick="createQuiz()" style="width: 100%">Publish Quiz</button>
+
+      <table>
+        <thead><tr><th>Question</th><th>Action</th></tr></thead>
+        <tbody id="quiz-body"></tbody>
+      </table>
+    </div>
+
+    <!-- LIBRARY MANAGEMENT -->
+    <div class="card">
+      <h3>📚 Upload PDF Books</h3>
+      <input type="text" id="bookTitle" placeholder="Book Title (e.g. Grade 10 Science)">
+      <input type="file" id="bookFile" accept=".pdf">
+      <button class="btn" id="uploadBtn" onclick="uploadBook()" style="width: 100%">Upload PDF</button>
+      
+      <table>
+        <thead><tr><th>Book Title</th><th>Action</th></tr></thead>
+        <tbody id="library-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- LIVE GRADEBOOK -->
+  <div class="card">
+    <h3>📊 Live Student Gradebook</h3>
+    <button class="btn" onclick="fetchGradebook()" style="margin-bottom: 15px;">Refresh Scores</button>
+    <table>
+      <thead><tr><th>Student Name</th><th>Quiz Score</th><th>Timestamp</th></tr></thead>
+      <tbody id="gradebook-body"></tbody>
+    </table>
+  </div>
+
+  <script>
+    // --- QUIZ MANAGEMENT ---
+    function fetchQuizzes() {
+      fetch('/api/quizzes')
+        .then(res => res.json())
+        .then(data => {
+          const tbody = document.getElementById('quiz-body');
+          tbody.innerHTML = '';
+          if(data.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="2" style="color:#94a3b8">No dynamic quizzes created yet.</td></tr>';
+            return;
+          }
+          data.forEach(q => {
+            tbody.innerHTML += `<tr>
+              <td>${q.question}</td>
+              <td><button class="btn btn-danger" onclick="deleteQuiz(${q.id})">Delete</button></td>
+            </tr>`;
+          });
+        });
+    }
+
+    function createQuiz() {
+      const q = document.getElementById('qQuestion').value.trim();
+      const o1 = document.getElementById('qOpt1').value.trim();
+      const o2 = document.getElementById('qOpt2').value.trim();
+      const correct = document.getElementById('qCorrect').value;
+
+      if (!q || !o1 || !o2) return alert('Please complete the question and both options.');
+
+      fetch('/api/create-quiz', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ question: q, options: [o1, o2], correctIndex: correct })
+      }).then(() => {
+        document.getElementById('qQuestion').value = '';
+        document.getElementById('qOpt1').value = '';
+        document.getElementById('qOpt2').value = '';
+        fetchQuizzes();
+      });
+    }
+
+    function deleteQuiz(id) {
+      if (confirm('Delete this quiz question?')) {
+        fetch('/api/delete-quiz/' + id, { method: 'DELETE' }).then(() => fetchQuizzes());
+      }
+    }
+
+    // --- LIBRARY MANAGEMENT ---
+    function fetchLibrary() {
+      fetch('/api/books')
+        .then(res => res.json())
+        .then(data => {
+          const tbody = document.getElementById('library-body');
+          tbody.innerHTML = '';
+          if(data.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="2" style="color:#94a3b8">No books uploaded yet.</td></tr>';
+            return;
+          }
+          data.forEach(book => {
+            tbody.innerHTML += `<tr>
+              <td>${book.title}</td>
+              <td><button class="btn btn-danger" onclick="deleteBook(${book.id})">Delete</button></td>
+            </tr>`;
+          });
+        });
+    }
+
+    function uploadBook() {
+      const title = document.getElementById('bookTitle').value.trim();
+      const fileInput = document.getElementById('bookFile');
+      if (!title || fileInput.files.length === 0) return alert('Please enter a title and select a PDF file.');
+
+      const file = fileInput.files[0];
+      const reader = new FileReader();
+      const btn = document.getElementById('uploadBtn');
+      btn.innerText = 'Uploading...'; btn.disabled = true;
+
+      reader.onload = function(e) {
+        fetch('/api/upload-book', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title: title, fileName: file.name, fileData: e.target.result })
+        }).then(() => {
+          document.getElementById('bookTitle').value = ''; fileInput.value = '';
+          btn.innerText = 'Upload PDF'; btn.disabled = false;
+          fetchLibrary();
+        });
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function deleteBook(id) {
+      if (confirm('Delete this book?')) {
+        fetch('/api/delete-book/' + id, { method: 'DELETE' }).then(() => fetchLibrary());
+      }
+    }
+
+    // --- GRADEBOOK ---
+    function fetchGradebook() {
+      fetch('/api/gradebook')
+        .then(res => res.json())
+        .then(data => {
+          const tbody = document.getElementById('gradebook-body');
+          tbody.innerHTML = '';
+          if(data.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="3" style="color:#94a3b8">No submissions yet.</td></tr>';
+            return;
+          }
+          data.forEach(row => {
+            tbody.innerHTML += `<tr><td>${row.student_name}</td><td>${row.score}%</td><td>${row.timestamp}</td></tr>`;
+          });
+        });
+    }
+
+    fetchQuizzes();
+    fetchLibrary();
+    fetchGradebook();
+    setInterval(fetchGradebook, 3000);
+  </script>
+</body>
+</html>
